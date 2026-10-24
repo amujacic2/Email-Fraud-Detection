@@ -1,9 +1,10 @@
 """Generate a synthetic labelled email dataset (data/emails.csv).
 
-The data is template-based and for demonstration only. It includes hard cases:
-legitimate mail that sounds urgent or contains links, and subtle fraud with no
-scary keywords (only a lookalike domain or failed authentication). Swap in a real
-corpus (e.g. Enron + Nazario phishing) with the same `text,label` columns for real use.
+Emails are composed from varied building blocks (greeting, scam story, ask, closer, optional
+headers/links) so the classifier cannot simply memorise a handful of templates. The data still
+contains hard cases: legitimate mail that sounds urgent or mentions money, and subtle fraud with
+a calm tone. It is synthetic and for demonstration only: for real use, swap in a genuine corpus
+(e.g. Enron + Nazario phishing) with the same `text,label` columns.
 """
 
 import csv
@@ -13,113 +14,209 @@ from pathlib import Path
 random.seed(7)
 
 BRANDS = ["PayPal", "Amazon", "Netflix", "Chase", "Microsoft", "Apple", "DHL"]
-NAMES = ["Alex", "Sam", "Jordan", "Taylor", "Morgan", "Casey", "Riley"]
+NAMES = ["Alex", "Sam", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Dana", "Chris"]
 TOPICS = ["Q3 budget", "project roadmap", "team offsite", "hiring plan", "release notes", "design review"]
 FAIL = "Authentication-Results: mx.example.net; spf=fail; dkim=none; dmarc=fail\n"
 PASS = "Authentication-Results: mx.example.net; spf=pass; dkim=pass; dmarc=pass\n"
 
-# (headers, subject, body)
-FRAUD = [
+F_GREET = [
+    "Dear customer,",
+    "Dear friend,",
+    "Dear Sir/Madam,",
+    "Hello,",
+    "Attention beneficiary,",
+    "Greetings,",
+    "Dear valued member,",
+    "Hi,",
+    "Dear account holder,",
+    "Congratulations!",
+    "",
+]
+F_CLOSE = [
+    "Act now!",
+    "Reply urgently.",
+    "Thank you for your cooperation.",
+    "Do not tell anyone.",
+    "Regards, Support Team",
+    "God bless you.",
+    "Respond within 24 hours or the offer expires.",
+    "Kindly confirm receipt.",
+    "",
+    "Best regards,\nSecurity Department",
+]
+F_CTA = [
+    "Click here: {url}",
+    "Follow this link to continue: {url}",
+    "Verify now at {url}",
+    "Log in at {url}",
+    "",
+    "",
+]
+F_ASK = [
+    "Reply with your full name, date of birth and bank details.",
+    "Send your account number and password to confirm your identity.",
+    "Please provide your social security number and a copy of your ID.",
+    "Confirm your card number and CVV to proceed.",
+    "Kindly send your full name and address so we can process this.",
+    "Enter your login credentials to restore access.",
+    "",
+]
+# Scam stories: (subject, body)
+F_STORY = [
     (
-        "From: security@{b}-alerts.{tld}\nReply-To: support@mail-{tld}.ru\n" + FAIL,
-        "URGENT: your {B} account has been suspended",
-        "Dear customer, your account will be closed within 24 hours. Verify your account immediately: "
-        "http://{ip}/login/{b}?id=88 . Enter your password and credentials to restore access!!!",
+        "Tax refund waiting",
+        "We noticed an error in your tax return. You are owed a refund of ${amt}. It will be deposited once verified.",
     ),
     (
-        "From: lottery@{tld}.com\nReply-To: claims@free-{tld}.com\n",
-        "You are a WINNER of the international lottery",
-        "Congratulations! You won 5 million dollars. To claim your prize send your bank account details "
-        "and a small processing fee by gift card or bitcoin. Act now, limited time!",
+        "Account locked",
+        "Your {B} account has been locked due to suspicious activity. Unlock it to avoid permanent suspension.",
     ),
     (
-        'From: "{B} Support" <ceo@company-mail.{tld}>\nReply-To: ceo.private@gmail.com\n',
-        "Quick favor needed ASAP",
-        "I am in a meeting and cannot talk. Please buy 5 gift card codes and send me the numbers immediately. "
-        "I will refund you today. Do not tell anyone.",
+        "Business proposal",
+        "I am Prince {N} from Nigeria. I have ${amt2} million to transfer out of the country and need a trusted partner. You will receive 30 percent.",
     ),
     (
-        "From: billing@{b}-pay.{tld}\n" + FAIL,
-        "Final notice: unpaid invoice",
-        '<html><body>Your payment failed. <a href="http://bit.ly/3x{n}">www.{b}.com/billing</a> '
-        '<form action="http://{ip}/pay"><input name="pin"></form> Update your login and PIN now.</body></html>',
+        "Work from home",
+        "You have been selected for a work from home job earning ${amt} weekly. No experience needed. Start today.",
     ),
     (
-        "From: prince@royal-{tld}.com\n",
-        "Confidential business proposal - inheritance transfer",
-        "I am the legal counsel of a late client with an inheritance of 12 million. I need your help with a "
-        "wire transfer and your social security number to release the funds. Reply urgent.",
+        "Quick task",
+        "Are you at your desk? I need you to do a quick task for me. Reply as soon as you see this. I am in a meeting and cannot talk.",
     ),
-    # Subtle: calm tone, only a lookalike domain + failed auth.
     (
-        'From: "{B}" <service@{b}-secure.{tld}>\n' + FAIL,
+        "Double your Bitcoin",
+        "Double your Bitcoin in 24 hours. Guaranteed returns. Send 0.5 BTC to our wallet and receive 1 BTC back.",
+    ),
+    (
+        "Package not delivered",
+        "Your package could not be delivered. Pay a $1.99 redelivery fee to reschedule.",
+    ),
+    (
+        "Inheritance claim",
+        "A late client of mine died leaving ${amt2} million dollars with no next of kin. As a beneficiary you can claim the inheritance. Keep this confidential.",
+    ),
+    ("You won!", "You have won a free iPhone in our monthly draw. Claim your prize now before it expires."),
+    (
+        "Lottery winner",
+        "Your email was selected as the winner of the international lottery, ${amt2} million dollars. A small processing fee by gift card is required.",
+    ),
+    (
+        "Invoice overdue",
+        "Your payment failed and your invoice is overdue. Update your payment method immediately to avoid legal action.",
+    ),
+    (
+        "Security alert",
+        "Unusual sign-in detected on your account. Your password may be compromised. Verify your account immediately.",
+    ),
+    (
+        "Change of bank details",
+        "Please note our change of bank details. Wire transfer the outstanding invoice today and keep this private.",
+    ),
+    (
+        "Virus detected",
+        "Viruses detected: your computer is infected. Call support or click the link to remove them now.",
+    ),
+    (
+        "Charity request",
+        "I am dying of cancer and want to donate my fortune of ${amt2} million to you. Please send your bank account details.",
+    ),
+    (
         "Your {B} receipt",
-        "Thanks for your order. You can review the details of your purchase here: https://{b}-secure.{tld}/orders/{n}. "
-        "If you did not make this purchase please sign in to review.",
-    ),
-    (
-        "From: hr@c0mpany.com\n" + FAIL,
-        "Updated {t} document",
-        "Please review the attached {t} document before our call. Open the file and sign in with your company account.",
+        "Thanks for your order. Review the details of your purchase here. If you did not make this purchase please sign in.",
     ),
 ]
+F_HEAD = [
+    "",
+    "",
+    "From: security@{b}-alerts.{tld}\nReply-To: support@mail-{tld}.ru\n" + FAIL,
+    'From: "{B} Support" <service@{b}-secure.{tld}>\n' + FAIL,
+    "From: lottery@free-{tld}.com\nReply-To: claims@gmail.com\n",
+    "From: ceo@company-mail.{tld}\nReply-To: ceo.private@gmail.com\n",
+    "From: hr@c0mpany.com\n" + FAIL,
+]
 
-LEGIT = [
+L_HEAD = [
+    "From: {n1}@company.com\n" + PASS,
+    "From: {n1}@company.com\n",
+    "",
+    "From: hr@company.com\n" + PASS,
+    "From: noreply@github.com\n" + PASS,
+    "From: {n1}@university.edu\n" + PASS,
+    "From: mom@family.net\n",
+]
+L_BODY = [
     (
-        "From: {n1}@company.com\n" + PASS,
         "Notes from the {t} meeting",
-        "Hi team, attached are the notes from today's {t} discussion. Let me know if I missed anything and "
-        "we can review it on Thursday.",
+        "Hi team, attached are the notes from today's {t} discussion. Let me know if I missed anything and we can review on Thursday.",
     ),
     (
-        "From: {n1}@company.com\n" + PASS,
         "Lunch tomorrow?",
         "Hey {N2}, are you free for lunch tomorrow around noon? There is a new place near the office.",
     ),
+    ("Meeting moved", "Hi {N2}, can we move our meeting to 3pm tomorrow? Thanks, {N1}"),
     (
-        "From: noreply@github.com\n" + PASS,
-        "[repo] Pull request merged",
+        "Pull request merged",
         "Your pull request has been merged into main. View it at https://github.com/org/repo/pull/{n}.",
     ),
     (
-        "From: hr@company.com\n" + PASS,
         "Updated {t} schedule",
         "Please find the updated schedule for the {t}. Calendar invites will follow shortly. Thanks, {N1}.",
     ),
     (
-        "From: {n1}@university.edu\n" + PASS,
         "Re: question about the assignment",
         "Thanks for your question, {N2}. The deadline is next Friday and office hours are Tuesday afternoon.",
     ),
-    # Hard negatives: urgent tone, links, money words, real brands.
     (
-        "From: it@company.com\n" + PASS,
         "URGENT: scheduled maintenance tonight",
-        "Our servers will be down immediately after 10pm for maintenance. Please save your work. "
-        "Status page: https://status.company.com/incidents/{n}",
+        "Our servers will be down immediately after 10pm for maintenance. Please save your work. Status: https://status.company.com/incidents/{n}",
     ),
     (
-        'From: "Amazon" <order-update@amazon.com>\n' + PASS,
         "Your Amazon order has shipped",
         "Your payment was processed and your package is on the way. Track it at https://www.amazon.com/progress/{n}. Thanks!",
     ),
     (
-        "From: billing@microsoft.com\n" + PASS,
         "Your invoice is ready",
         "Your monthly invoice for {t} is available. Sign in at https://account.microsoft.com to download it.",
     ),
     (
-        "From: {n1}@company.com\n" + PASS,
-        "Reminder: expense refund approved",
+        "Expense refund approved",
         "Hi {N2}, your refund for the offsite was approved and will arrive with the next payment run. No action needed.",
+    ),
+    ("Sunday dinner", "Can you bring dessert on Sunday? Love you! Mom"),
+    (
+        "Quick question",
+        "Hey, quick question about the {t}. Do you have a minute to chat this afternoon? Thanks.",
+    ),
+    (
+        "Happy birthday!",
+        "Happy birthday {N2}! Hope you have a wonderful day. We are all getting cake at 3pm!",
+    ),
+    (
+        "Password reset requested",
+        "You asked to reset your password for your account. If this was you, use the link: https://accounts.google.com/reset/{n}. If not, ignore this email.",
+    ),
+    (
+        "Bank statement available",
+        "Your monthly statement is ready. Sign in to the Chase app to view it. We will never ask for your password by email.",
+    ),
+    (
+        "Interview schedule",
+        "Hi {N2}, we would like to schedule your interview for the {t} role next Tuesday. Please reply with your availability.",
+    ),
+    (
+        "Conference invite",
+        "You are invited to our annual conference. Registration is free and details are on the website. Hope to see you there, {N1}.",
+    ),
+    (
+        "Wire confirmation",
+        "Hi {N2}, the wire for the {t} vendor invoice went out today as agreed with finance. Receipt attached.",
     ),
 ]
 
 
-def render(tpl: tuple) -> str:
-    headers, subj, body = tpl
+def ctx() -> dict:
     b = random.choice(BRANDS)
-    ctx = dict(
+    return dict(
         b=b.lower(),
         B=b,
         tld=random.choice(["xyz", "top", "click", "ru", "info", "com", "net"]),
@@ -128,15 +225,43 @@ def render(tpl: tuple) -> str:
         n1=random.choice(NAMES).lower(),
         N1=random.choice(NAMES),
         N2=random.choice(NAMES),
+        N=random.choice(NAMES),
         t=random.choice(TOPICS),
+        amt=f"{random.randint(1, 9)},{random.randint(100, 999)}",
+        amt2=random.randint(2, 40),
     )
-    text = headers + "Subject: " + subj + "\n\n" + body + "\n"
-    return text.format(**ctx)
+
+
+def fraud() -> str:
+    c = ctx()
+    c["url"] = random.choice(
+        [
+            f"http://{c['ip']}/login",
+            f"http://bit.ly/3x{c['n']}",
+            f"http://{c['b']}-secure.{c['tld']}/verify",
+            f"https://{c['b']}.com-verify.{c['tld']}/a",
+        ]
+    )
+    subj, story = random.choice(F_STORY)
+    parts = [
+        random.choice(F_GREET),
+        story,
+        random.choice(F_ASK),
+        random.choice(F_CTA),
+        random.choice(F_CLOSE),
+    ]
+    body = "\n".join(p for p in parts if p)
+    return (random.choice(F_HEAD) + "Subject: " + subj + "\n\n" + body + "\n").format(**c)
+
+
+def legit() -> str:
+    c = ctx()
+    subj, body = random.choice(L_BODY)
+    return (random.choice(L_HEAD) + "Subject: " + subj + "\n\n" + body + "\n").format(**c)
 
 
 def main() -> None:
-    rows = [(render(random.choice(FRAUD)), 1) for _ in range(300)]
-    rows += [(render(random.choice(LEGIT)), 0) for _ in range(300)]
+    rows = [(fraud(), 1) for _ in range(600)] + [(legit(), 0) for _ in range(600)]
     random.shuffle(rows)
     out = Path(__file__).resolve().parent.parent / "data" / "emails.csv"
     out.parent.mkdir(exist_ok=True)

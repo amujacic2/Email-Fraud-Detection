@@ -22,7 +22,7 @@ Most spam filters are black boxes. This one tells you **why** an email looks fra
 ```mermaid
 flowchart LR
     A[Raw email] --> B[Parser<br/>headers, body, attachments]
-    B --> C[18 heuristic features]
+    B --> C[25 heuristic features]
     B --> D[TF-IDF text vectors]
     C --> E[Rule score<br/>weighted, no training]
     C --> F[Logistic regression]
@@ -50,6 +50,10 @@ flowchart LR
 | `html_form` | Credential-harvesting forms inside the email |
 | `urgency_hits` / `money_hits` / `credential_hits` | Pressure, payment, and password language |
 | `exclaim_count` | Shouty punctuation |
+| `pii_request` | Asks you to send SSN, date of birth, card number, bank details, passwords |
+| `scam_phrases` | Prize/lottery, advance-fee, inheritance, tax refund, work-from-home, crypto doubling, locked-account and delivery-fee wording |
+| `bec_pattern` | Boss/CEO impersonation: "are you at your desk?", "quick task", "reply as soon as you see this" |
+| `generic_greeting` / `secrecy` / `click_cta` / `large_amount` | "Dear friend", "do not tell anyone", "click here", multi-million sums |
 
 ## Quick start
 

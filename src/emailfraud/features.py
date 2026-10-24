@@ -58,6 +58,75 @@ MONEY_WORDS = (
 )
 CREDENTIAL_WORDS = ("password", "login", "ssn", "social security", "pin", "credentials", "otp")
 LEET = str.maketrans({"0": "o", "1": "l", "3": "e", "5": "s", "4": "a", "$": "s"})
+
+
+def _rx(*patterns: str) -> list[re.Pattern]:
+    return [re.compile(p, re.I) for p in patterns]
+
+
+# Language patterns typical of scams. Each list is counted per distinct pattern that matches.
+PII_REQUEST_RE = re.compile(
+    r"\b(send|provide|reply with|confirm|enter|verify|update|share|submit|give)\b.{0,80}?"
+    r"(ssn|social security|date of birth|\bdob\b|card number|cvv|account number|bank details|bank account|"
+    r"routing number|passport|copy of your id|id card|full name|\bpin\b|password|credentials|mother'?s maiden)",
+    re.I | re.S,
+)
+SCAM_PHRASES = _rx(
+    r"\byou(?:'ve| have)? (?:just )?won\b",
+    r"\bwinner\b",
+    r"\bclaim (?:it |your |the )?(?:now|prize|reward|funds|gift|inheritance)",
+    r"\bselected (?:for|to receive)\b",
+    r"\bfree (?:iphone|ipad|gift|laptop|cruise|vacation)",
+    r"\bno experience (?:needed|required|necessary)",
+    r"\bwork from home\b",
+    r"\bearn \$?\d[\d,]* ?(?:per|a|/|weekly|daily)",
+    r"\bguaranteed (?:returns?|income|profits?)",
+    r"\bdouble your\b",
+    r"\b(?:btc|bitcoin|crypto|ethereum|usdt)\b.{0,60}(?:send|wallet|transfer|invest)",
+    r"\b(?:next of kin|unclaimed (?:funds|inheritance)|late client|deceased|inheritance)\b",
+    r"\bbeneficiary\b",
+    r"\b(?:transfer|release) (?:of )?(?:the |these )?funds\b",
+    r"\b\d+ ?(?:%|percent) (?:commission|share|of the)",
+    r"\b(?:processing|redelivery|clearance|handling|release) fee\b",
+    r"\bgift cards?\b",
+    r"\b(?:tax refund|you are owed|owed a refund|refund of)\b",
+    r"\bgovernment grant\b",
+    r"\b(?:account|card) (?:has been|was|is) (?:locked|suspended|limited|compromised|blocked|disabled)\b",
+    r"\b(?:suspicious|unusual|unauthori[sz]ed) (?:activity|sign[- ]?in|login|transaction)",
+    r"\bunlock (?:your|it|the)\b",
+    r"\b(?:could not|couldn'?t|unable to) be delivered\b",
+    r"\bpackage (?:is )?(?:on hold|held|pending)\b",
+    r"\bkindly (?:send|provide|confirm|reply|forward)\b",
+    r"\bviruses? (?:detected|found)|your (?:device|computer|pc) (?:is|has been) infected",
+    r"\bwire (?:transfer|the money)\b",
+    r"\bbank transfer\b.{0,40}\b(?:urgent|immediately|today)",
+)
+GENERIC_GREETING_RE = re.compile(
+    r"^\s*(?:dear|hello|greetings|attention)[ ,]+(?:valued |esteemed )?(?:customer|friend|sir|madam|sir/madam|beneficiary|"
+    r"user|winner|account holder|client|member|email owner)\b",
+    re.I | re.M,
+)
+SECRECY_RE = re.compile(
+    r"\b(?:do not|don'?t|never) (?:tell|share|discuss|call|disclose|inform)\b|\bkeep (?:this )?(?:private|secret|confidential)\b|"
+    r"\bstrictly confidential\b|\bcan'?t (?:talk|take calls)\b|\bcannot (?:talk|take calls)\b",
+    re.I,
+)
+CTA_RE = re.compile(
+    r"\b(?:click|tap) (?:here|the link|below|on the link)|\bfollow (?:this|the) link\b|\bopen the attach",
+    re.I,
+)
+BEC_PATTERNS = _rx(
+    r"\bare you (?:at your desk|available|around|there)\b",
+    r"\bquick (?:task|favou?r|errand)\b",
+    r"\breply (?:as soon as|asap|when you see|once you see)",
+    r"\bi(?:'m| am) (?:in a meeting|travell?ing|busy right now)\b",
+    r"\bneed you to (?:do|handle|take care of)\b",
+    r"\bchange (?:of|my) (?:bank|payment|account) (?:details|info)",
+)
+LARGE_AMOUNT_RE = re.compile(
+    r"\$\s?\d{1,3}(?:,\d{3})+|\b\d+(?:\.\d+)? ?(?:million|billion)\b|\b\d{4,}(?:,\d{3})* ?(?:usd|dollars|euros|gbp)\b|\b\d+(?:\.\d+)? ?btc\b",
+    re.I,
+)
 AUTH_FAIL_RE = re.compile(r"\b(spf|dkim|dmarc)=(fail|softfail|none|permerror|temperror)", re.I)
 
 FEATURE_NAMES = [
@@ -79,6 +148,13 @@ FEATURE_NAMES = [
     "display_name_spoof",
     "lookalike_domain",
     "risky_attachment",
+    "pii_request",
+    "scam_phrases",
+    "generic_greeting",
+    "secrecy",
+    "click_cta",
+    "bec_pattern",
+    "large_amount",
 ]
 # Features shown to users as human-readable signals (skip raw counts/ratios).
 SIGNAL_NAMES = [n for n in FEATURE_NAMES if n not in ("num_urls", "upper_ratio")]
@@ -193,6 +269,13 @@ def extract_features(raw: str) -> dict[str, float]:
         "display_name_spoof": float(_display_name_spoof(from_header)),
         "lookalike_domain": float(_lookalike(hosts + ([from_dom] if from_dom else []))),
         "risky_attachment": float(_risky_attachment(msg)),
+        "pii_request": float(bool(PII_REQUEST_RE.search(text))),
+        "scam_phrases": float(sum(bool(p.search(text)) for p in SCAM_PHRASES)),
+        "generic_greeting": float(bool(GENERIC_GREETING_RE.search(body))),
+        "secrecy": float(bool(SECRECY_RE.search(text))),
+        "click_cta": float(bool(CTA_RE.search(text))),
+        "bec_pattern": float(sum(bool(p.search(text)) for p in BEC_PATTERNS)),
+        "large_amount": float(bool(LARGE_AMOUNT_RE.search(text))),
     }
 
 
@@ -213,8 +296,15 @@ def rule_score(feats: dict[str, float]) -> float:
         + 0.4 * min(feats["money_hits"], 2)
         + 0.4 * min(feats["credential_hits"], 1)
         + 0.3 * float(feats["exclaim_count"] >= 3)
+        + 1.5 * feats["pii_request"]
+        + 0.9 * min(feats["scam_phrases"], 3)
+        + 0.5 * feats["generic_greeting"]
+        + 0.8 * feats["secrecy"]
+        + 0.5 * feats["click_cta"]
+        + 1.0 * min(feats["bec_pattern"], 2)
+        + 0.8 * feats["large_amount"]
     )
-    return 1.0 - math.exp(-raw / 2.5)
+    return 1.0 - math.exp(-raw / 2.0)
 
 
 def feature_vector(raw: str) -> list[float]:

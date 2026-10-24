@@ -1,6 +1,6 @@
 [project]
 name = "email-fraud-detection"
-version = "0.2.0"
+version = "0.3.0"
 description = "Detect phishing and fraudulent emails with explainable heuristics plus a TF-IDF classifier."
 readme = "README.md"
 license = { text = "MIT" }
