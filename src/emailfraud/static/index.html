@@ -4,79 +4,335 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Email Fraud Detection</title>
+<meta name="description" content="Paste an email and see whether it looks like phishing or fraud, with a plain-English explanation.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 2 4 7v8c0 7.5 5 13 12 15 7-2 12-7.5 12-15V7z' fill='%236366f1'/%3E%3Cpath d='m10 16 4 4 8-8' stroke='%23fff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
-  :root { --bg:#0f1420; --card:#171e2e; --text:#e8ecf4; --muted:#8b95ab; --line:#27304a;
-          --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --accent:#6366f1; }
-  @media (prefers-color-scheme: light) {
-    :root { --bg:#f5f6fa; --card:#fff; --text:#1b2030; --muted:#5b6479; --line:#dde1ec; }
+  :root {
+    --bg:#0b1020; --bg2:#121936; --card:#161e3a; --card2:#1c2547; --text:#e9edf8; --muted:#97a2c2;
+    --line:#2a3560; --accent:#7c83ff; --accent2:#a78bfa;
+    --ok:#34d399; --warn:#fbbf24; --bad:#fb7185; --shadow:0 10px 40px rgba(0,0,0,.35);
   }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui, sans-serif; }
-  main { max-width:820px; margin:0 auto; padding:32px 16px 64px; }
-  h1 { margin:0 0 4px; font-size:28px; }
-  p.sub { margin:0 0 24px; color:var(--muted); }
-  textarea { width:100%; min-height:240px; padding:14px; border-radius:12px; border:1px solid var(--line);
-             background:var(--card); color:var(--text); font:14px/1.5 ui-monospace, Consolas, monospace; resize:vertical; }
-  .row { display:flex; gap:10px; margin:14px 0; flex-wrap:wrap; }
-  button { padding:10px 18px; border-radius:10px; border:1px solid var(--line); background:var(--card);
-           color:var(--text); font-size:15px; cursor:pointer; }
-  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
-  button:focus-visible, textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  #result { display:none; margin-top:20px; padding:20px; border-radius:12px; background:var(--card); border:1px solid var(--line); }
-  .verdict { font-size:22px; font-weight:700; }
-  .bar { height:10px; border-radius:6px; background:var(--line); margin:12px 0; overflow:hidden; }
-  .bar > div { height:100%; width:0; transition:width .4s; }
-  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-  .chip { padding:4px 10px; border-radius:999px; border:1px solid var(--line); font-size:13px; color:var(--muted); }
-  .error { color:var(--bad); margin-top:12px; }
+  :root[data-theme="light"] {
+    --bg:#f4f6fc; --bg2:#e8ecfa; --card:#ffffff; --card2:#f1f4fc; --text:#16203d; --muted:#5d6a8d;
+    --line:#d9dff0; --accent:#5b62f0; --accent2:#8b5cf6;
+    --ok:#059669; --warn:#b45309; --bad:#e11d48; --shadow:0 10px 30px rgba(40,60,120,.12);
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; color:var(--text); font:16px/1.55 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background:radial-gradient(1100px 500px at 15% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent),
+               radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, var(--accent2) 16%, transparent), transparent), var(--bg);
+    min-height:100vh;
+  }
+  .wrap { max-width:1060px; margin:0 auto; padding:0 20px 72px; }
+  header.top { display:flex; align-items:center; justify-content:space-between; padding:22px 0; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-.01em; }
+  .brand svg { width:30px; height:30px; }
+  .top-actions { display:flex; gap:10px; align-items:center; }
+  .iconbtn, .link { color:var(--muted); background:transparent; border:1px solid var(--line); border-radius:10px;
+    padding:7px 12px; font-size:14px; cursor:pointer; text-decoration:none; }
+  .iconbtn:hover, .link:hover { color:var(--text); border-color:var(--accent); }
+
+  .hero { text-align:center; padding:26px 0 30px; }
+  .hero h1 { margin:0 0 10px; font-size:clamp(30px, 5vw, 48px); line-height:1.1; letter-spacing:-.03em; }
+  .hero h1 span { background:linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero p { margin:0 auto; max-width:620px; color:var(--muted); font-size:18px; }
+  .badges { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
+  .badge { font-size:13px; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:4px 12px; background:var(--card); }
+
+  .grid { display:grid; grid-template-columns:1.15fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:900px) { .grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:var(--shadow); }
+  .card h2 { margin:0 0 4px; font-size:17px; }
+  .hint { color:var(--muted); font-size:14px; margin:0 0 12px; }
+
+  .drop { position:relative; }
+  textarea {
+    width:100%; min-height:300px; padding:14px; border-radius:12px; border:1px solid var(--line);
+    background:var(--card2); color:var(--text); font:14px/1.55 ui-monospace, "Cascadia Code", Consolas, monospace; resize:vertical;
+  }
+  textarea:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .drop.over textarea { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, var(--card2)); }
+  .meta { display:flex; justify-content:space-between; color:var(--muted); font-size:13px; margin-top:6px; }
+
+  .examples { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+  .chip-btn { background:var(--card2); color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:5px 12px; font-size:13px; cursor:pointer; }
+  .chip-btn:hover { color:var(--text); border-color:var(--accent); }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  button.primary {
+    flex:1; min-width:150px; padding:13px 20px; border:0; border-radius:12px; font-size:16px; font-weight:650; color:#fff; cursor:pointer;
+    background:linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow:0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  button.primary:hover { filter:brightness(1.08); }
+  button.primary:disabled { opacity:.6; cursor:wait; }
+  button.ghost { padding:13px 16px; border-radius:12px; background:transparent; color:var(--muted); border:1px solid var(--line); cursor:pointer; font-size:15px; }
+  button.ghost:hover { color:var(--text); border-color:var(--accent); }
+  button:focus-visible, a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  kbd { font:12px ui-monospace, Consolas, monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px; color:var(--muted); }
+
+  .empty { text-align:center; padding:50px 10px; color:var(--muted); }
+  .empty .big { font-size:46px; }
+  #result { display:none; }
+  .gauge { width:100%; max-width:300px; margin:0 auto; display:block; }
+  .gauge .arc { transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1), stroke .3s; }
+  .gauge text.num { font-size:44px; font-weight:750; fill:var(--text); }
+  .gauge text.lbl { font-size:13px; fill:var(--muted); }
+  .verdict { text-align:center; margin-top:-6px; }
+  .verdict .title { font-size:26px; font-weight:750; letter-spacing:-.02em; }
+  .verdict .sub { color:var(--muted); font-size:15px; margin-top:2px; }
+  .pill { display:inline-block; margin-top:10px; padding:4px 14px; border-radius:999px; font-weight:650; font-size:13px; text-transform:uppercase; letter-spacing:.06em; }
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0 6px; }
+  .mini { background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+  .mini b { display:block; font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+  .mini .bar { height:6px; border-radius:4px; background:var(--line); margin-top:8px; overflow:hidden; }
+  .mini .bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .7s; }
+  .mini span { font-size:18px; font-weight:700; }
+
+  h3 { margin:22px 0 10px; font-size:15px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  .signals { display:grid; gap:10px; }
+  .sig { display:flex; gap:12px; background:var(--card2); border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:12px; padding:11px 13px; }
+  .sig.hi { border-left-color:var(--bad); }
+  .sig .ic { font-size:22px; line-height:1.2; }
+  .sig b { display:block; font-size:15px; }
+  .sig p { margin:2px 0 0; color:var(--muted); font-size:13.5px; }
+  .clean { background:color-mix(in srgb, var(--ok) 12%, var(--card2)); border:1px solid color-mix(in srgb, var(--ok) 40%, var(--line)); border-radius:12px; padding:12px 14px; color:var(--text); }
+  .advice { margin-top:16px; padding:12px 14px; border-radius:12px; background:var(--card2); border:1px dashed var(--line); color:var(--muted); font-size:14px; }
+
+  .history { margin-top:26px; }
+  .hist-item { display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:var(--card2); border:1px solid var(--line);
+    border-radius:12px; padding:10px 12px; margin-bottom:8px; color:var(--text); cursor:pointer; font:inherit; }
+  .hist-item:hover { border-color:var(--accent); }
+  .dot { width:10px; height:10px; border-radius:50%; flex:none; }
+  .hist-item .t { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
+  .hist-item .s { color:var(--muted); font-size:13px; }
+  .error { display:none; margin-top:12px; padding:10px 14px; border-radius:10px; color:var(--bad); background:color-mix(in srgb, var(--bad) 12%, transparent); border:1px solid color-mix(in srgb, var(--bad) 40%, transparent); }
+  footer { text-align:center; color:var(--muted); font-size:13px; margin-top:40px; }
+  footer a { color:var(--accent); }
+  .spin { display:inline-block; width:16px; height:16px; border:2px solid #fff6; border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; margin-right:8px; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } }
 </style>
 </head>
 <body>
-<main>
-  <h1>Email Fraud Detection</h1>
-  <p class="sub">Paste a raw email (with headers if you have them) and get a fraud score with explainable signals.</p>
-  <label for="raw" class="sub">Raw email</label>
-  <textarea id="raw" placeholder="From: ...&#10;Subject: ...&#10;&#10;Body"></textarea>
-  <div class="row">
-    <button class="primary" id="scan">Scan email</button>
-    <button id="ex-bad">Load phishing example</button>
-    <button id="ex-ok">Load legitimate example</button>
-  </div>
-  <div id="err" class="error" role="alert"></div>
-  <section id="result" aria-live="polite">
-    <div class="verdict" id="verdict"></div>
-    <div class="bar"><div id="fill"></div></div>
-    <div id="detail" class="sub"></div>
-    <div class="chips" id="chips"></div>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 7v8c0 7.5 5 13 12 15 7-2 12-7.5 12-15V7z" fill="#6366f1"/><path d="m10 16 4 4 8-8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Email Fraud Detection
+    </div>
+    <div class="top-actions">
+      <a class="link" href="/docs">API docs</a>
+      <a class="link" href="https://github.com/amujacic2/Email-Fraud-Detection" target="_blank" rel="noopener">GitHub</a>
+      <button class="iconbtn" id="theme" aria-label="Toggle light and dark theme">Theme</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1>Is that email <span>a scam?</span></h1>
+    <p>Paste any email below. You get a fraud score and a plain-English list of exactly what looks suspicious. Nothing is stored on a server.</p>
+    <div class="badges"><span class="badge">Rules + machine learning</span><span class="badge">25 fraud signals</span><span class="badge">Explainable</span></div>
   </section>
-</main>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="in-h">
+      <h2 id="in-h">Email to check</h2>
+      <p class="hint">Paste the text, or drop an .eml / .txt file onto the box. Headers are optional but make detection better.</p>
+      <div class="drop" id="drop">
+        <textarea id="raw" spellcheck="false" placeholder="Paste the email here...&#10;&#10;Tip: in Gmail choose ⋮ → Show original to include headers."></textarea>
+      </div>
+      <div class="meta"><span id="count">0 characters</span><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to scan</span></div>
+      <div class="examples" role="group" aria-label="Load an example">
+        <button class="chip-btn" data-ex="prize">🎁 Prize scam</button>
+        <button class="chip-btn" data-ex="bank">🏦 Bank phishing</button>
+        <button class="chip-btn" data-ex="boss">👔 Boss scam</button>
+        <button class="chip-btn" data-ex="tax">🧾 Tax refund</button>
+        <button class="chip-btn" data-ex="ok">✅ Normal email</button>
+      </div>
+      <div class="actions">
+        <button class="primary" id="scan">Scan email</button>
+        <button class="ghost" id="clear">Clear</button>
+      </div>
+      <div class="error" id="err" role="alert"></div>
+    </section>
+
+    <section class="card" aria-live="polite" aria-labelledby="out-h">
+      <h2 id="out-h">Result</h2>
+      <div class="empty" id="empty"><div class="big">🔍</div>Your result will appear here.<br>Try one of the examples to see how it works.</div>
+      <div id="result">
+        <svg class="gauge" viewBox="0 0 240 140" role="img" aria-label="Fraud score gauge">
+          <path d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="var(--line)" stroke-width="16" stroke-linecap="round"/>
+          <path id="arc" class="arc" d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="var(--ok)" stroke-width="16" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+          <text id="num" class="num" x="120" y="108" text-anchor="middle">0%</text>
+          <text class="lbl" x="120" y="132" text-anchor="middle">fraud likelihood</text>
+        </svg>
+        <div class="verdict">
+          <div class="title" id="vtitle"></div>
+          <div class="sub" id="vsub"></div>
+          <span class="pill" id="pill"></span>
+        </div>
+        <div class="split">
+          <div class="mini"><b>Rule engine</b><span id="rule">0%</span><div class="bar"><i id="rulebar"></i></div></div>
+          <div class="mini"><b>ML model</b><span id="ml">0%</span><div class="bar"><i id="mlbar"></i></div></div>
+        </div>
+        <h3>What we found</h3>
+        <div class="signals" id="signals"></div>
+        <div class="advice" id="advice"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="history card" id="histbox" style="display:none">
+    <h2>Recent scans</h2>
+    <p class="hint">Saved only in this browser.</p>
+    <div id="hist"></div>
+  </section>
+
+  <footer>A decision aid, not a guarantee. The bundled model is trained on synthetic data. · <a href="https://github.com/amujacic2/Email-Fraud-Detection" target="_blank" rel="noopener">Source on GitHub</a></footer>
+</div>
+
 <script>
-const EX = {
-  bad: "From: \"PayPal\" <security@paypa1-alerts.xyz>\nReply-To: help@mail.ru\nAuthentication-Results: mx; spf=fail; dmarc=fail\nSubject: URGENT: account suspended\n\nVerify your account immediately: http://185.23.44.9/login and enter your password!!!",
-  ok: "From: sam@company.com\nSubject: Notes from the design review\n\nHi team, attached are the notes from today's design review. Let me know if I missed anything."
-};
 const $ = id => document.getElementById(id);
-$("ex-bad").onclick = () => $("raw").value = EX.bad;
-$("ex-ok").onclick = () => $("raw").value = EX.ok;
-$("scan").onclick = async () => {
-  $("err").textContent = "";
-  const raw = $("raw").value.trim();
-  if (!raw) { $("err").textContent = "Paste an email first."; return; }
-  try {
-    const r = await fetch("/scan", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ raw }) });
-    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
-    const d = await r.json();
-    const color = d.risk === "high" ? "var(--bad)" : d.risk === "medium" ? "var(--warn)" : "var(--ok)";
-    $("result").style.display = "block";
-    $("verdict").textContent = d.label === "fraud" ? "Likely fraud" : "Looks legitimate";
-    $("verdict").style.color = color;
-    $("fill").style.width = Math.round(d.score * 100) + "%";
-    $("fill").style.background = color;
-    $("detail").textContent = "Fraud score " + d.score.toFixed(2) + " · " + d.risk + " risk";
-    $("chips").replaceChildren(...(d.signals.length ? d.signals : ["no suspicious signals"]).map(s => {
-      const c = document.createElement("span"); c.className = "chip"; c.textContent = s.replaceAll("_", " "); return c; }));
-  } catch (e) { $("err").textContent = "Error: " + e.message; }
+const EX = {
+  prize: "Dear Winner,\n\nCongratulations! You have won a free iPhone and $2,000,000 in our international lottery. To claim your prize now, reply with your full name, date of birth and bank details and pay a small processing fee by gift card.\n\nDo not tell anyone. Act now, this offer expires in 24 hours!",
+  bank: "From: \"PayPal Support\" <security@paypa1-alerts.xyz>\nReply-To: help@mail-center.ru\nAuthentication-Results: mx; spf=fail; dkim=none; dmarc=fail\nSubject: URGENT: your account has been suspended\n\nDear customer, we noticed suspicious activity. Verify your account immediately: http://185.23.44.9/login and enter your password to restore access!!!",
+  boss: "Hi, are you at your desk? I need you to do a quick task for me. I'm in a meeting and can't talk. Reply as soon as you see this. Please keep this between us.",
+  tax: "Dear Sir,\n\nWe noticed an error in your tax return. You are owed a refund of $1,284. Reply with your full name, date of birth and bank details so we can deposit it.",
+  ok: "From: sam@company.com\nSubject: Notes from the design review\n\nHi team, attached are the notes from today's design review. Let me know if I missed anything and we can go over them on Thursday. Thanks, Sam"
 };
+const SIG = {
+  has_ip_url: ["🌐","Link to a raw IP address","Real companies link to named websites. A bare number like 185.23.44.9 is a common phishing trick.",1],
+  lookalike_domain: ["🪞","Look-alike domain","The sender or a link imitates a known brand (e.g. paypa1.com) without being the real site.",1],
+  display_name_spoof: ["🎭","Spoofed sender name","The name shows a trusted brand but the email address belongs to someone else.",1],
+  auth_failures: ["🚫","Failed sender checks","SPF/DKIM/DMARC failures mean the email may not really come from who it claims.",1],
+  reply_to_mismatch: ["↩️","Replies go somewhere else","The Reply-To address differs from the sender, so your answer would reach someone different.",0],
+  link_text_mismatch: ["🔗","Link text doesn't match its target","The visible link looks safe but actually points to a different site.",1],
+  has_punycode: ["🔤","Disguised characters in a domain","Look-alike foreign characters can make a fake domain appear genuine.",1],
+  risky_attachment: ["📎","Risky attachment","Executable or macro-enabled files such as .exe, .js or .docm are a classic way to deliver malware.",1],
+  has_shortener: ["✂️","Shortened link","URL shorteners hide where a link really goes.",0],
+  has_suspicious_tld: ["⚠️","Low-trust web address ending","Endings like .xyz, .top or .ru are heavily used by scammers.",0],
+  has_at_in_url: ["@","Trick link with an @ sign","Anything before an @ in a link is ignored by browsers, which scammers abuse to hide the real address.",1],
+  html_form: ["📝","Form inside the email","Legitimate companies rarely ask you to type credentials inside an email.",1],
+  urgency_hits: ["⏰","Pressure to act fast","Urgent deadlines are used to stop you thinking carefully.",0],
+  money_hits: ["💰","Money-related wording","Mentions of payments, prizes, refunds or transfers, typical of financial scams.",0],
+  credential_hits: ["🔑","Asks about passwords or PINs","Genuine services never ask for your password by email.",1],
+  exclaim_count: ["❗","Excessive exclamation marks","Shouty punctuation is common in scam emails.",0],
+  pii_request: ["🪪","Asks for personal or bank details","Requests for SSN, date of birth, card or account numbers are a strong fraud sign.",1],
+  scam_phrases: ["🎣","Known scam wording","Phrases typical of prize, inheritance, refund, job, crypto or delivery-fee scams.",1],
+  generic_greeting: ["👋","Generic greeting","\"Dear friend\" or \"Dear customer\" suggests mass mailing, not a message meant for you.",0],
+  secrecy: ["🤫","Asks you to keep it secret","Scammers isolate victims by asking for secrecy or no phone calls.",1],
+  click_cta: ["👆","Pushes you to click","\"Click here\" calls to action are used to send you to fake pages.",0],
+  bec_pattern: ["👔","Boss / executive impersonation","Vague 'quick task' requests that avoid calls are a known business-email-compromise pattern.",1],
+  large_amount: ["💸","Unrealistically large sum","Multi-million amounts are a hallmark of advance-fee scams.",0]
+};
+const ADVICE = {
+  high: "Don't click links, open attachments or reply. If it claims to be from a company you use, go to their site directly (type the address yourself) or call a number you already trust. Report it as phishing in your mail app.",
+  medium: "Be careful. Verify the sender through another channel before clicking anything or sharing information.",
+  low: "No strong warning signs found. Still, stay alert: this tool can miss well-crafted scams."
+};
+const COLORS = { high:"var(--bad)", medium:"var(--warn)", low:"var(--ok)" };
+const store = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+// Theme
+const root = document.documentElement;
+function applyTheme(t) { if (t) root.dataset.theme = t; else delete root.dataset.theme; }
+applyTheme(store.get("theme", null));
+$("theme").onclick = () => {
+  const dark = (root.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")) === "dark";
+  const next = dark ? "light" : "dark"; applyTheme(next); store.set("theme", next);
+};
+if (!store.get("theme", null) && matchMedia("(prefers-color-scheme: light)").matches) applyTheme("light");
+
+// Input handling
+const raw = $("raw");
+const updateCount = () => $("count").textContent = raw.value.length.toLocaleString() + " characters";
+raw.addEventListener("input", updateCount);
+raw.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") scan(); });
+document.querySelectorAll("[data-ex]").forEach(b => b.onclick = () => { raw.value = EX[b.dataset.ex]; updateCount(); scan(); });
+$("clear").onclick = () => { raw.value = ""; updateCount(); $("result").style.display = "none"; $("empty").style.display = "block"; $("err").style.display = "none"; raw.focus(); };
+
+// Drag and drop a file
+const drop = $("drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", async e => {
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  if (f.size > 2_000_000) return showError("That file is larger than 2 MB.");
+  raw.value = await f.text(); updateCount(); scan();
+});
+
+function showError(msg) { const e = $("err"); e.textContent = msg; e.style.display = msg ? "block" : "none"; }
+function pct(x) { return Math.round(x * 100) + "%"; }
+
+async function scan() {
+  showError("");
+  const text = raw.value.trim();
+  if (!text) return showError("Paste an email or load an example first.");
+  const btn = $("scan"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Scanning...';
+  try {
+    const r = await fetch("/scan", { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify({ raw:text }) });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.detail || r.statusText); }
+    const d = await r.json(); render(d); remember(text, d);
+  } catch (e) { showError("Something went wrong: " + e.message); }
+  finally { btn.disabled = false; btn.textContent = "Scan email"; }
+}
+$("scan").onclick = scan;
+
+function render(d) {
+  $("empty").style.display = "none"; $("result").style.display = "block";
+  const color = COLORS[d.risk];
+  const arc = $("arc"); arc.style.stroke = color; arc.style.strokeDashoffset = 314.16 * (1 - d.score);
+  $("num").textContent = pct(d.score);
+  const fraud = d.label === "fraud";
+  $("vtitle").textContent = fraud ? (d.risk === "high" ? "Very likely a scam" : "Looks suspicious") : "Looks legitimate";
+  $("vtitle").style.color = color;
+  $("vsub").textContent = fraud ? "Several warning signs were detected." : "No strong warning signs were detected.";
+  const pill = $("pill"); pill.textContent = d.risk + " risk"; pill.style.color = color;
+  pill.style.background = "color-mix(in srgb, " + color + " 16%, transparent)";
+  $("rule").textContent = pct(d.rule_score); $("rulebar").style.width = pct(d.rule_score);
+  $("ml").textContent = pct(d.ml_score); $("mlbar").style.width = pct(d.ml_score);
+  const box = $("signals"); box.replaceChildren();
+  if (!d.signals.length) {
+    const c = document.createElement("div"); c.className = "clean"; c.textContent = "✅ No suspicious signals found in this email."; box.append(c);
+  }
+  const ordered = [...d.signals].sort((a, b) => ((SIG[b] || [0,0,0,0])[3]) - ((SIG[a] || [0,0,0,0])[3]));
+  for (const s of ordered) {
+    const [ic, title, desc, hi] = SIG[s] || ["•", s.replaceAll("_", " "), "", 0];
+    const el = document.createElement("div"); el.className = "sig" + (hi ? " hi" : "");
+    const i = document.createElement("div"); i.className = "ic"; i.textContent = ic;
+    const body = document.createElement("div");
+    const b = document.createElement("b"); b.textContent = title;
+    const p = document.createElement("p"); p.textContent = desc;
+    body.append(b, p); el.append(i, body); box.append(el);
+  }
+  $("advice").textContent = ADVICE[d.risk];
+  if (matchMedia("(max-width:900px)").matches) $("result").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+// History
+function remember(text, d) {
+  const h = store.get("history", []);
+  h.unshift({ text, score:d.score, risk:d.risk, label:d.label, t:Date.now() });
+  store.set("history", h.slice(0, 6)); renderHistory();
+}
+function renderHistory() {
+  const h = store.get("history", []);
+  $("histbox").style.display = h.length ? "block" : "none";
+  const box = $("hist"); box.replaceChildren();
+  for (const it of h) {
+    const b = document.createElement("button"); b.className = "hist-item";
+    const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = COLORS[it.risk];
+    const t = document.createElement("span"); t.className = "t"; t.textContent = it.text.replace(/\s+/g, " ").slice(0, 90);
+    const s = document.createElement("span"); s.className = "s"; s.textContent = pct(it.score);
+    b.append(dot, t, s);
+    b.onclick = () => { raw.value = it.text; updateCount(); scan(); window.scrollTo({ top:0, behavior:"smooth" }); };
+    box.append(b);
+  }
+}
+renderHistory(); updateCount();
 </script>
 </body>
 </html>

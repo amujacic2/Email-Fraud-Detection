@@ -20,3 +20,6 @@
 
 ## 0.3.1
 - Fix: "Model not found" error. The model path is now anchored to the project folder (works from any directory) and a demo model is trained automatically on first use.
+
+## 0.3.2
+- Redesigned web UI: score gauge, plain-English signal explanations, example emails, drag-and-drop .eml files, scan history, light/dark theme, mobile layout.
