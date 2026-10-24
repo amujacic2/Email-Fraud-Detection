@@ -1,0 +1,20 @@
+[project]
+name = "email-fraud-detection"
+version = "0.1.0"
+description = "Detect phishing and fraudulent emails with heuristics plus a TF-IDF classifier."
+requires-python = ">=3.10"
+dependencies = ["scikit-learn>=1.5", "pandas>=2.2", "joblib>=1.4"]
+
+[project.scripts]
+emailfraud = "emailfraud.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
