@@ -1,0 +1,7 @@
+From: "PayPal Support" <service@paypa1-secure.top>
+Reply-To: refunds@mail-center.ru
+Authentication-Results: mx.example.net; spf=fail; dkim=none; dmarc=fail
+Subject: Your refund is waiting
+
+We processed a refund to your bank account. Confirm your login here:
+<a href="http://bit.ly/3xK9">www.paypal.com/refund</a>

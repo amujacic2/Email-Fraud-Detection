@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .model import DEFAULT_MODEL, FraudDetector, train_from_csv
+from .model import DEFAULT_MODEL, FraudDetector, cross_validate, train_from_csv
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -15,6 +15,10 @@ def main(argv: list[str] | None = None) -> int:
     t = sub.add_parser("train", help="train a model from a CSV (columns: text,label)")
     t.add_argument("--data", type=Path, default=Path("data/emails.csv"))
     t.add_argument("--out", type=Path, default=DEFAULT_MODEL)
+
+    e = sub.add_parser("evaluate", help="k-fold cross-validate on a CSV")
+    e.add_argument("--data", type=Path, default=Path("data/emails.csv"))
+    e.add_argument("--folds", type=int, default=5)
 
     s = sub.add_parser("scan", help="score one or more .eml/.txt files (or '-' for stdin)")
     s.add_argument("files", nargs="+")
@@ -30,6 +34,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Model saved to {args.out}")
         return 0
 
+    if args.cmd == "evaluate":
+        for name, value in cross_validate(args.data, args.folds).items():
+            print(f"{name:>9}: {value:.3f}")
+        return 0
+
     model = FraudDetector.load(args.model)
     results = []
     for f in args.files:
@@ -40,7 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         for r in results:
             signals = ", ".join(r["signals"]) or "none"
-            print(f"{r['file']}: {r['label'].upper()} (score {r['score']:.2f}) signals: {signals}")
+            print(
+                f"{r['file']}: {r['label'].upper()} [{r['risk']} risk] score {r['score']:.2f} | signals: {signals}"
+            )
     return 1 if any(r["label"] == "fraud" for r in results) else 0
 
 

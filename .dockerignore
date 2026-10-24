@@ -1,0 +1,7 @@
+.venv
+.git
+__pycache__
+*.egg-info
+models/*.joblib
+.pytest_cache
+.ruff_cache

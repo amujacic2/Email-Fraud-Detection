@@ -22,6 +22,7 @@ def test_legitimate_email_is_quiet():
     assert f["num_urls"] == 0
     assert f["urgency_hits"] == 0
     assert f["reply_to_mismatch"] == 0
+    assert f["lookalike_domain"] == 0
 
 
 def test_link_text_mismatch_detected():
@@ -29,3 +30,33 @@ def test_link_text_mismatch_detected():
     f = extract_features(raw)
     assert f["link_text_mismatch"] == 1
     assert f["has_suspicious_tld"] == 1
+
+
+def test_auth_failures_counted():
+    raw = "From: a@b.com\nAuthentication-Results: mx; spf=fail; dkim=pass; dmarc=fail\nSubject: x\n\nhi"
+    assert extract_features(raw)["auth_failures"] == 2
+
+
+def test_display_name_spoof():
+    spoof = 'From: "PayPal Support" <help@random-host.net>\nSubject: x\n\nhi'
+    real = 'From: "PayPal" <service@paypal.com>\nSubject: x\n\nhi'
+    assert extract_features(spoof)["display_name_spoof"] == 1
+    assert extract_features(real)["display_name_spoof"] == 0
+
+
+def test_lookalike_domain_leet_and_hyphen():
+    assert extract_features("Subject: x\n\nsee http://paypa1.com/login")["lookalike_domain"] == 1
+    assert extract_features("Subject: x\n\nsee http://paypal-secure.xyz/a")["lookalike_domain"] == 1
+    assert extract_features("Subject: x\n\nsee https://www.paypal.com/help")["lookalike_domain"] == 0
+    assert extract_features("Subject: x\n\nsee https://shop.purchase.com/a")["lookalike_domain"] == 0
+
+
+def test_punycode_and_risky_attachment():
+    assert extract_features("Subject: x\n\nhttp://xn--pypal-4ve.com/")["has_punycode"] == 1
+    raw = (
+        "Subject: invoice\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=B\n\n"
+        "--B\nContent-Type: text/plain\n\nsee attached\n"
+        "--B\nContent-Type: application/octet-stream\n"
+        'Content-Disposition: attachment; filename="invoice.pdf.exe"\n\nMZ\n--B--\n'
+    )
+    assert extract_features(raw)["risky_attachment"] == 1
