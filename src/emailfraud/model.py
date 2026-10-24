@@ -14,7 +14,30 @@ from sklearn.preprocessing import StandardScaler
 
 from .features import SIGNAL_NAMES, extract_features, feature_vector, parse_email, rule_score
 
-DEFAULT_MODEL = Path("models/model.joblib")
+_ROOT = Path(__file__).resolve().parents[2]
+# In a source checkout, anchor paths to the project root so they work from any directory.
+_IN_CHECKOUT = (_ROOT / "pyproject.toml").exists()
+DEFAULT_MODEL = _ROOT / "models" / "model.joblib" if _IN_CHECKOUT else Path("models/model.joblib")
+DEFAULT_DATA = _ROOT / "data" / "emails.csv" if _IN_CHECKOUT else Path("data/emails.csv")
+
+
+def ensure_model(path: Path = DEFAULT_MODEL) -> Path:
+    """Return a model path, training a demo model first if none exists yet."""
+    path = Path(path)
+    if path.exists():
+        return path
+    if not DEFAULT_DATA.exists():
+        generator = _ROOT / "scripts" / "generate_data.py"
+        if not generator.exists():
+            raise FileNotFoundError(
+                f"No model at {path} and no training data. Run `emailfraud train --data ...`."
+            )
+        import runpy
+
+        runpy.run_path(str(generator), run_name="__main__")
+    model, _ = train_from_csv(DEFAULT_DATA)
+    model.save(path)
+    return path
 
 
 class FraudDetector:

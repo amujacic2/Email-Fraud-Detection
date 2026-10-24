@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from . import __version__
-from .model import DEFAULT_MODEL, FraudDetector
+from .model import DEFAULT_MODEL, FraudDetector, ensure_model
 
 STATIC = Path(__file__).parent / "static"
 app = FastAPI(title="Email Fraud Detection", version=__version__)
@@ -31,8 +31,10 @@ class ScanResponse(BaseModel):
 @lru_cache(maxsize=1)
 def get_model() -> FraudDetector:
     path = Path(os.environ.get("EMAILFRAUD_MODEL", DEFAULT_MODEL))
-    if not path.exists():
-        raise HTTPException(503, f"Model not found at {path}. Run `emailfraud train` first.")
+    try:
+        path = ensure_model(path)
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc)) from exc
     return FraudDetector.load(path)
 
 

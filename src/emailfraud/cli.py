@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .model import DEFAULT_MODEL, FraudDetector, cross_validate, train_from_csv
+from .model import DEFAULT_DATA, DEFAULT_MODEL, FraudDetector, cross_validate, ensure_model, train_from_csv
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -13,11 +13,11 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     t = sub.add_parser("train", help="train a model from a CSV (columns: text,label)")
-    t.add_argument("--data", type=Path, default=Path("data/emails.csv"))
+    t.add_argument("--data", type=Path, default=DEFAULT_DATA)
     t.add_argument("--out", type=Path, default=DEFAULT_MODEL)
 
     e = sub.add_parser("evaluate", help="k-fold cross-validate on a CSV")
-    e.add_argument("--data", type=Path, default=Path("data/emails.csv"))
+    e.add_argument("--data", type=Path, default=DEFAULT_DATA)
     e.add_argument("--folds", type=int, default=5)
 
     s = sub.add_parser("scan", help="score one or more .eml/.txt files (or '-' for stdin)")
@@ -39,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name:>9}: {value:.3f}")
         return 0
 
-    model = FraudDetector.load(args.model)
+    model = FraudDetector.load(ensure_model(args.model))
     results = []
     for f in args.files:
         raw = sys.stdin.read() if f == "-" else Path(f).read_text(encoding="utf-8", errors="replace")

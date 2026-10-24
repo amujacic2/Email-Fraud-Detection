@@ -17,3 +17,6 @@
 
 ## 0.1.0
 - Initial release: heuristic features, TF-IDF logistic regression, CLI, tests.
+
+## 0.3.1
+- Fix: "Model not found" error. The model path is now anchored to the project folder (works from any directory) and a demo model is trained automatically on first use.
